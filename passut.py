@@ -13,13 +13,14 @@ from subprocess import Popen, PIPE, STDOUT
 filepath = ('auth.csv.gpg',)
 pubkeyid = 'Your key here'
 pipecmd = ('pbcopy',)
+defaultgroup = "Default"
 
 # Commands
 decryptcmd = ('gpg2', '-q', '-d')
 encryptcmd = ('gpg2', '-ea', '-r', pubkeyid)
 
 Credentials = namedtuple('Credentials',
-                         ['name', 'username', 'password', 'info'])
+                         ['name', 'username', 'password', 'group', 'info'])
 
 def main(action='get', name=''):
     if action == 'get':
@@ -60,8 +61,9 @@ def row_to_dict(row):
     name = row[0]
     username = row[1]
     password = row[2]
-    info = get_or_else(row, 3)
-    return Credentials(name, username, password, info)
+    group = row[3]
+    info = get_or_else(row, 4)
+    return Credentials(name, username, password, group, info)
 
 def get_or_else(l, i, alt=None):
     return l[i] if i < len(l) else alt
@@ -74,9 +76,10 @@ def deliver_credentials(creds):
         print "No matches found"
 
 def show_information(creds):
-    print "Found:", creds.name
+    print "Name  :", creds.name
+    print "Group :", creds.group
     if creds.info:
-        print creds.info
+        print "Info  :",creds.info
     print "----"
 
 def pipe_credentials(creds):
@@ -110,9 +113,10 @@ def get_creds_from_user(name=''):
             name = read_input('Name?')
         username = read_input('User name?')
         password = getpass('Password? ')
+        group = read_input('Group?') or defaultgroup
         info = read_input('Info?')
         if read_yes_no():
-            return Credentials(name, username, password, info)
+            return Credentials(name, username, password, group, info)
 
 def read_input(prompt='>'):
     return raw_input(prompt + ' ').decode(sys.stdin.encoding)
