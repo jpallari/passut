@@ -59,7 +59,7 @@ class Passut(object):
             print 'Incorrect action:', action
 
     def find_and_deliver_credentials(self, name):
-        deliver_credentials(self.find_credentials(name))
+        self.deliver_credentials(self.find_credentials(name))
 
     def find_credentials(self, lookup_string):
         with self.credentials_readstream() as f:
@@ -69,6 +69,29 @@ class Passut(object):
                 return row_to_credentials(row)
             else:
                 return None
+
+    def deliver_credentials(self, creds):
+        if creds:
+            print_multiline_info(creds)
+            print "----"
+            self.pipe_credentials(creds)
+        else:
+            print "No matches found"
+
+    def pipe_credentials(self, creds):
+        self.send_to_pipe('user name', creds.username)
+        self.send_to_pipe('password', creds.password)
+
+    def send_to_pipe(self, key, value):
+        if value:
+            wait_for_enter(key)
+            self.pipe(value)
+        else:
+            print "No %s found" % key
+
+    def pipe(self, value):
+        p = Popen(self.pipecmd, stdin=PIPE)
+        p.communicate(value)
 
     def credentials_readstream(self):
         p = Popen(self.decryptcmd, stdin=open(self.authfilepath),
@@ -126,38 +149,15 @@ def row_to_credentials(row):
 def get_or_else(l, i, alt=None):
     return l[i] if i < len(l) else alt
 
-def deliver_credentials(creds):
-    if creds:
-        print_multiline_info(creds)
-        print "----"
-        pipe_credentials(creds)
-    else:
-        print "No matches found"
-
 def print_multiline_info(creds):
     print "Name  :", creds.name
     print "Group :", creds.group
     if creds.info:
         print "Info  :",creds.info
 
-def pipe_credentials(creds):
-    send_to_pipe('user name', creds.username)
-    send_to_pipe('password', creds.password)
-
-def send_to_pipe(key, value):
-    if value:
-        wait_for_enter(key)
-        pipe(value)
-    else:
-        print "No %s found" % key
-
 def wait_for_enter(key):
     print "Press enter to pipe", key
     sys.stdin.read(1)
-
-def pipe(value):
-    p = Popen(pipecmd, stdin=PIPE)
-    p.communicate(value)
 
 def get_creds_from_user(cred):
     while True:
