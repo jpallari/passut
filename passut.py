@@ -34,9 +34,8 @@ def read_passut_config():
     return dict(cfgp.items('passut'))
 
 def write_default_config():
-    if not os.path.exists(config_path):
-        with open(config_path, 'w') as f:
-            f.write(default_config_file)
+    with open(config_path, 'w') as f:
+        f.write(default_config_file)
 
 class Passut(object):
     def __init__(self, authfilepath,
@@ -214,7 +213,10 @@ def print_singleline_info(cred):
 if __name__ == '__main__':
     action = get_or_else(sys.argv, 1, 'get')
     name = ' '.join(sys.argv[2:])
-    write_default_config()
-    config = read_passut_config()
-    passut = Passut(**config)
-    passut.doaction(action, name)
+    if os.path.exists(config_path):
+        config = read_passut_config()
+        passut = Passut(**config)
+        passut.doaction(action, name)
+    else:
+        write_default_config()
+        print "Wrote configuration file to %s" % config_path
