@@ -3,7 +3,7 @@
 
 import os
 import sys
-import csv
+import unicodecsv
 from itertools import groupby
 from shutil import copyfileobj
 from collections import namedtuple
@@ -42,7 +42,8 @@ def find_and_deliver_credentials(name):
 
 def find_credentials(lookup_string):
     with credentials_readstream() as f:
-        row = find_row_by_name(csv.reader(f), lookup_string)
+        reader = unicodecsv.reader(f, encoding='utf-8')
+        row = find_row_by_name(reader, lookup_string)
         if row:
             return row_to_credentials(row)
         else:
@@ -74,7 +75,7 @@ def row_to_credentials(row):
     username = row[1]
     password = row[2]
     group = row[3]
-    info = get_or_else(row, 4)
+    info = get_or_else(row, 4, '')
     return Credentials(name, username, password, group, info)
 
 def get_or_else(l, i, alt=None):
@@ -114,41 +115,48 @@ def pipe(value):
     p.communicate(value)
 
 def save_credentials(name):
-    defaultcreds = Credentials(name, '', '', '', '')
+    defaultcreds = Credentials(name, '', '', defaultgroup, '')
     creds = get_creds_from_user(defaultcreds)
     readstream = credentials_readstream()
     writestream = credentials_writestream()
     copy_and_write_credentials(readstream, writestream, creds)
+    readstream.close()
+    writestream.close()
 
 def get_creds_from_user(cred):
     while True:
-        name = read_input('Name [%s]?' % cred.name)
-        username = read_input('User name [%s]?' % cred.username)
+        name = read_input('Name', cred.name)
+        username = read_input('User name', cred.username)
         password = getpass('Password? ')
-        group = read_input('Group [%s]?' % cred.username) or defaultgroup
-        info = read_input('Info [%s]?' % cred.info)
+        group = read_input('Group', cred.group)
+        info = read_input('Info', cred.info)
         if read_yes_no():
             return Credentials(name, username, password, group, info)
 
-def read_input(prompt='>'):
-    return raw_input(prompt + ' ').decode(sys.stdin.encoding)
+def read_input(prompt, defaultvalue=''):
+    if defaultvalue != None:
+        p = '%s [%s]? ' % (prompt, defaultvalue)
+    else:
+        p = "%s? " % prompt
+    return raw_input(p).decode(sys.stdin.encoding) or defaultvalue
 
 def read_yes_no():
     yes = set(['yes', 'y', 'ye'])
     no = set(['no', 'n'])
     while True:
-        choice = read_input('OK?').lower()
+        choice = read_input('OK', None).lower()
         if choice in yes:
             return True
         elif choice in no:
             return False
 
 def copy_and_write_credentials(readstream, writestream, creds):
-    with writestream as ws:
-        copyfileobj(readstream, ws)
-        writer = csv.writer(ws)
-        writer.writerow(list(creds))
-        writestream.close()
+    copyfileobj(readstream, writestream)
+    writer = unicodecsv.writer(writestream, encoding='utf-8')
+    writer.writerow(creds_to_row(creds))
+
+def creds_to_row(creds):
+    return list(creds)
 
 def credentials_writestream():
     fname = os.path.join(*filepath)
@@ -156,19 +164,20 @@ def credentials_writestream():
               stdout=open(fname, 'w'), close_fds=True)
     return p.stdin
 
+def list_groups(name):
+    groups = find_matching_groups(name)
+    print_groups(groups)
+
 def find_matching_groups(name):
     with credentials_readstream() as f:
-        rows = rows_matching_groups(csv.reader(f), name)
+        reader = unicodecsv.reader(f, encoding='utf-8')
+        rows = rows_matching_groups(reader, name)
         credentials = (row_to_credentials(row) for row in rows)
         return groupby(credentials, lambda c: c.group)
 
 def rows_matching_groups(reader, name):
     return [row for row in reader
             if not name or startswith_caseinsensitive(row[3], name)]
-
-def list_groups(name):
-    groups = find_matching_groups(name)
-    print_groups(groups)
 
 def print_groups(groups):
     for groupname, credentials in groups:
