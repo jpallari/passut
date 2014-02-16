@@ -5,17 +5,12 @@ import os
 import sys
 import unicodecsv
 import shlex
+from ConfigParser import ConfigParser
 from itertools import groupby
 from shutil import copyfileobj
 from collections import namedtuple
 from getpass import getpass
 from subprocess import Popen, PIPE, STDOUT
-
-# Place your own settings here
-filepath = 'auth.csv.gpg'
-pubkeyid = 'Your key here'
-pipecmd = 'pbcopy'
-defaultgroup = "Default"
 
 Credentials = namedtuple('Credentials',
                          ['name', 'username', 'password', 'group', 'info'])
@@ -24,9 +19,29 @@ getaction = set(['get', 'g'])
 saveaction = set(['save', 's'])
 listaction = set(['list', 'l'])
 
+config_path = os.path.join(os.environ['HOME'], '.passut.cfg')
+
+default_config_file = """[passut]
+authfilepath = $HOME/.auth.csv.gpg
+pubkeyid = Your key here
+pipecmd = pbcopy
+defaultgroup = Default
+"""
+
+def read_passut_config():
+    cfgp = ConfigParser()
+    cfgp.read(config_path)
+    return dict(cfgp.items('passut'))
+
+def write_default_config():
+    if not os.path.exists(config_path):
+        with open(config_path, 'w') as f:
+            f.write(default_config_file)
+
 class Passut(object):
-    def __init__(self, filepath, pubkeyid, pipecmd, defaultgroup='Default'):
-        self.filepath = os.path.expandvars(filepath)
+    def __init__(self, authfilepath,
+                 pubkeyid, pipecmd, defaultgroup='Default'):
+        self.authfilepath = os.path.expandvars(authfilepath)
         self.pubkeyid = pubkeyid
         self.pipecmd = shlex.split(pipecmd)
         self.defaultgroup = defaultgroup
@@ -56,7 +71,7 @@ class Passut(object):
                 return None
 
     def credentials_readstream(self):
-        p = Popen(self.decryptcmd, stdin=open(self.filepath),
+        p = Popen(self.decryptcmd, stdin=open(self.authfilepath),
                   stdout=PIPE, stderr=STDOUT, close_fds=True)
         p.wait()
         return p.stdout
@@ -72,7 +87,7 @@ class Passut(object):
 
     def credentials_writestream(self):
         p = Popen(self.encryptcmd, stdin=PIPE,
-                  stdout=open(self.filepath, 'w'), close_fds=True)
+                  stdout=open(self.authfilepath, 'w'), close_fds=True)
         return p.stdin
 
     def list_groups(self, name):
@@ -198,5 +213,7 @@ def print_singleline_info(cred):
 if __name__ == '__main__':
     action = get_or_else(sys.argv, 1, 'get')
     name = ' '.join(sys.argv[2:])
-    passut = Passut(filepath, pubkeyid, pipecmd, defaultgroup)
+    write_default_config()
+    config = read_passut_config()
+    passut = Passut(**config)
     passut.doaction(action, name)
