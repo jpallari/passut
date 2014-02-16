@@ -4,6 +4,7 @@
 import os
 import sys
 import unicodecsv
+import shlex
 from itertools import groupby
 from shutil import copyfileobj
 from collections import namedtuple
@@ -11,14 +12,10 @@ from getpass import getpass
 from subprocess import Popen, PIPE, STDOUT
 
 # Place your own settings here
-filepath = ('auth.csv.gpg',)
+filepath = 'auth.csv.gpg'
 pubkeyid = 'Your key here'
-pipecmd = ('pbcopy',)
+pipecmd = 'pbcopy'
 defaultgroup = "Default"
-
-# Commands
-decryptcmd = ('gpg2', '-q', '-d')
-encryptcmd = ('gpg2', '-ea', '-r', pubkeyid)
 
 Credentials = namedtuple('Credentials',
                          ['name', 'username', 'password', 'group', 'info'])
@@ -27,34 +24,67 @@ getaction = set(['get', 'g'])
 saveaction = set(['save', 's'])
 listaction = set(['list', 'l'])
 
-def main(action='get', name=''):
-    if action in getaction:
-        find_and_deliver_credentials(name)
-    elif action in saveaction:
-        save_credentials(name)
-    elif action in listaction:
-        list_groups(name)
-    else:
-        print 'Incorrect action:', action
+class Passut(object):
+    def __init__(self, filepath, pubkeyid, pipecmd, defaultgroup='Default'):
+        self.filepath = os.path.expandvars(filepath)
+        self.pubkeyid = pubkeyid
+        self.pipecmd = shlex.split(pipecmd)
+        self.defaultgroup = defaultgroup
+        self.decryptcmd = ('gpg2', '-q', '-d')
+        self.encryptcmd = ('gpg2', '-ea', '-r', self.pubkeyid)
 
-def find_and_deliver_credentials(name):
-    deliver_credentials(find_credentials(name))
-
-def find_credentials(lookup_string):
-    with credentials_readstream() as f:
-        reader = unicodecsv.reader(f, encoding='utf-8')
-        row = find_row_by_name(reader, lookup_string)
-        if row:
-            return row_to_credentials(row)
+    def doaction(self, action, name):
+        if action in getaction:
+            self.find_and_deliver_credentials(name)
+        elif action in saveaction:
+            self.save_credentials(name)
+        elif action in listaction:
+            self.list_groups(name)
         else:
-            return None
+            print 'Incorrect action:', action
 
-def credentials_readstream():
-    fname = os.path.join(*filepath)
-    p = Popen(decryptcmd, stdin=open(fname),
-              stdout=PIPE, stderr=STDOUT, close_fds=True)
-    p.wait()
-    return p.stdout
+    def find_and_deliver_credentials(self, name):
+        deliver_credentials(self.find_credentials(name))
+
+    def find_credentials(self, lookup_string):
+        with self.credentials_readstream() as f:
+            reader = unicodecsv.reader(f, encoding='utf-8')
+            row = find_row_by_name(reader, lookup_string)
+            if row:
+                return row_to_credentials(row)
+            else:
+                return None
+
+    def credentials_readstream(self):
+        p = Popen(self.decryptcmd, stdin=open(self.filepath),
+                  stdout=PIPE, stderr=STDOUT, close_fds=True)
+        p.wait()
+        return p.stdout
+
+    def save_credentials(self, name):
+        defaultcreds = Credentials(name, '', '', defaultgroup, '')
+        creds = get_creds_from_user(defaultcreds)
+        readstream = self.credentials_readstream()
+        writestream = self.credentials_writestream()
+        copy_and_write_credentials(readstream, writestream, creds)
+        readstream.close()
+        writestream.close()
+
+    def credentials_writestream(self):
+        p = Popen(self.encryptcmd, stdin=PIPE,
+                  stdout=open(self.filepath, 'w'), close_fds=True)
+        return p.stdin
+
+    def list_groups(self, name):
+        groups = self.find_matching_groups(name)
+        print_groups(groups)
+
+    def find_matching_groups(self, name):
+        with self.credentials_readstream() as f:
+            reader = unicodecsv.reader(f, encoding='utf-8')
+            rows = rows_matching_group(reader, name)
+            credentials = (row_to_credentials(row) for row in rows)
+            return groupby(credentials, lambda c: c.group)
 
 def find_row_by_name(reader, lookup_string):
     g = (row for row in reader
@@ -114,15 +144,6 @@ def pipe(value):
     p = Popen(pipecmd, stdin=PIPE)
     p.communicate(value)
 
-def save_credentials(name):
-    defaultcreds = Credentials(name, '', '', defaultgroup, '')
-    creds = get_creds_from_user(defaultcreds)
-    readstream = credentials_readstream()
-    writestream = credentials_writestream()
-    copy_and_write_credentials(readstream, writestream, creds)
-    readstream.close()
-    writestream.close()
-
 def get_creds_from_user(cred):
     while True:
         name = read_input('Name', cred.name)
@@ -158,24 +179,7 @@ def copy_and_write_credentials(readstream, writestream, creds):
 def creds_to_row(creds):
     return list(creds)
 
-def credentials_writestream():
-    fname = os.path.join(*filepath)
-    p = Popen(encryptcmd, stdin=PIPE,
-              stdout=open(fname, 'w'), close_fds=True)
-    return p.stdin
-
-def list_groups(name):
-    groups = find_matching_groups(name)
-    print_groups(groups)
-
-def find_matching_groups(name):
-    with credentials_readstream() as f:
-        reader = unicodecsv.reader(f, encoding='utf-8')
-        rows = rows_matching_groups(reader, name)
-        credentials = (row_to_credentials(row) for row in rows)
-        return groupby(credentials, lambda c: c.group)
-
-def rows_matching_groups(reader, name):
+def rows_matching_group(reader, name):
     return [row for row in reader
             if not name or startswith_caseinsensitive(row[3], name)]
 
@@ -194,4 +198,5 @@ def print_singleline_info(cred):
 if __name__ == '__main__':
     action = get_or_else(sys.argv, 1, 'get')
     name = ' '.join(sys.argv[2:])
-    main(action, name)
+    passut = Passut(filepath, pubkeyid, pipecmd, defaultgroup)
+    passut.doaction(action, name)
