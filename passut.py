@@ -79,6 +79,7 @@ class Passut(object):
             print "No matches found"
 
     def pipe_credentials(self, creds):
+        print "Piping credentials to:", ' '.join(self.pipecmd)
         self.send_to_pipe('user name', creds.username)
         self.send_to_pipe('password', creds.password)
 
