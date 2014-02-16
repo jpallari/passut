@@ -22,11 +22,14 @@ encryptcmd = ('gpg2', '-ea', '-r', pubkeyid)
 Credentials = namedtuple('Credentials',
                          ['name', 'username', 'password', 'group', 'info'])
 
+getaction = set(['get', 'g'])
+saveaction = set(['save', 's'])
+
 def main(action='get', name=''):
-    if action == 'get':
+    if action in getaction:
         creds = find_credentials(name)
         deliver_credentials(creds)
-    elif action == 'save':
+    elif action in saveaction:
         save_password_with_wizard(name)
     else:
         print 'Incorrect action:', action
