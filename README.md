@@ -14,8 +14,7 @@ saved in CSV format encrypted using GPG.
 
 1. Install GnuPG and some pipe program
 2. Install unicodecsv. You might need to be root in order to do this.
-
-        $ pip install unicodecsv
+   `pip install unicodecsv`
 3. Install [passut.py][] into your path, and make it executable.
 4. Run passut.py once in order to generate a new configuration file.
 5. In your home directory there is a file `.passut.cfg`. Set your settings
