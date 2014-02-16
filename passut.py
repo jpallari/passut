@@ -4,6 +4,7 @@
 import os
 import sys
 import csv
+from itertools import groupby
 from shutil import copyfileobj
 from collections import namedtuple
 from getpass import getpass
@@ -24,22 +25,26 @@ Credentials = namedtuple('Credentials',
 
 getaction = set(['get', 'g'])
 saveaction = set(['save', 's'])
+listaction = set(['list', 'l'])
 
 def main(action='get', name=''):
     if action in getaction:
         creds = find_credentials(name)
         deliver_credentials(creds)
     elif action in saveaction:
-        save_password_with_wizard(name)
+        creds = get_creds_from_user(name)
+        save_credentials(creds)
+    elif action in listaction:
+        groups = find_matching_groups(name)
+        print_groups(groups)
     else:
         print 'Incorrect action:', action
 
 def find_credentials(lookup_string):
     with credentials_readstream() as f:
-        reader = csv.reader(f)
-        row = find_row_by_name(reader, lookup_string)
+        row = find_row_by_name(csv.reader(f), lookup_string)
         if row:
-            return row_to_dict(row)
+            return row_to_credentials(row)
         else:
             return None
 
@@ -51,16 +56,20 @@ def credentials_readstream():
     return p.stdout
 
 def find_row_by_name(reader, lookup_string):
-    for row in reader:
-        name = row[0]
-        if startswith_caseinsensitive(name, lookup_string):
-            return row
-    return None
+    g = (row for row in reader
+         if startswith_caseinsensitive(row[0], lookup_string))
+    return next_or_none(g)
 
 def startswith_caseinsensitive(a, b):
     return a.lower().startswith(b.lower())
 
-def row_to_dict(row):
+def next_or_none(g):
+    try:
+        return g.next()
+    except StopIteration:
+        return None
+
+def row_to_credentials(row):
     name = row[0]
     username = row[1]
     password = row[2]
@@ -73,17 +82,17 @@ def get_or_else(l, i, alt=None):
 
 def deliver_credentials(creds):
     if creds:
-        show_information(creds)
+        print_multiline_info(creds)
+        print "----"
         pipe_credentials(creds)
     else:
         print "No matches found"
 
-def show_information(creds):
+def print_multiline_info(creds):
     print "Name  :", creds.name
     print "Group :", creds.group
     if creds.info:
         print "Info  :",creds.info
-    print "----"
 
 def pipe_credentials(creds):
     send_to_pipe('user name', creds.username)
@@ -104,11 +113,10 @@ def pipe(value):
     p = Popen(pipecmd, stdin=PIPE)
     p.communicate(value)
 
-def save_password_with_wizard(name=''):
-    creds = get_creds_from_user(name)
+def save_credentials(creds):
     readstream = credentials_readstream()
     writestream = credentials_writestream()
-    save_creds(readstream, writestream, creds)
+    copy_and_write_credentials(readstream, writestream, creds)
 
 def get_creds_from_user(name=''):
     while True:
@@ -134,7 +142,7 @@ def read_yes_no():
         elif choice in no:
             return False
 
-def save_creds(readstream, writestream, creds):
+def copy_and_write_credentials(readstream, writestream, creds):
     with writestream as ws:
         copyfileobj(readstream, ws)
         writer = csv.writer(ws)
@@ -146,6 +154,28 @@ def credentials_writestream():
     p = Popen(encryptcmd, stdin=PIPE,
               stdout=open(fname, 'w'), close_fds=True)
     return p.stdin
+
+def find_matching_groups(name):
+    with credentials_readstream() as f:
+        rows = rows_matching_groups(csv.reader(f), name)
+        credentials = (row_to_credentials(row) for row in rows)
+        return groupby(credentials, lambda c: c.group)
+
+def rows_matching_groups(reader, name):
+    return [row for row in reader
+            if not name or startswith_caseinsensitive(row[3], name)]
+
+def print_groups(groups):
+    for groupname, credentials in groups:
+        print "\n---", groupname, "---"
+        for cred in credentials:
+            print_singleline_info(cred)
+
+def print_singleline_info(cred):
+    if cred.info:
+        print "%s, %s" % (cred.name, cred.info)
+    else:
+        print cred.name
 
 if __name__ == '__main__':
     action = get_or_else(sys.argv, 1, 'get')
