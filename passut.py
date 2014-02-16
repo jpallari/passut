@@ -29,16 +29,16 @@ listaction = set(['list', 'l'])
 
 def main(action='get', name=''):
     if action in getaction:
-        creds = find_credentials(name)
-        deliver_credentials(creds)
+        find_and_deliver_credentials(name)
     elif action in saveaction:
-        creds = get_creds_from_user(name)
-        save_credentials(creds)
+        save_credentials(name)
     elif action in listaction:
-        groups = find_matching_groups(name)
-        print_groups(groups)
+        list_groups(name)
     else:
         print 'Incorrect action:', action
+
+def find_and_deliver_credentials(name):
+    deliver_credentials(find_credentials(name))
 
 def find_credentials(lookup_string):
     with credentials_readstream() as f:
@@ -113,19 +113,20 @@ def pipe(value):
     p = Popen(pipecmd, stdin=PIPE)
     p.communicate(value)
 
-def save_credentials(creds):
+def save_credentials(name):
+    defaultcreds = Credentials(name, '', '', '', '')
+    creds = get_creds_from_user(defaultcreds)
     readstream = credentials_readstream()
     writestream = credentials_writestream()
     copy_and_write_credentials(readstream, writestream, creds)
 
-def get_creds_from_user(name=''):
+def get_creds_from_user(cred):
     while True:
-        if not name:
-            name = read_input('Name?')
-        username = read_input('User name?')
+        name = read_input('Name [%s]?' % cred.name)
+        username = read_input('User name [%s]?' % cred.username)
         password = getpass('Password? ')
-        group = read_input('Group?') or defaultgroup
-        info = read_input('Info?')
+        group = read_input('Group [%s]?' % cred.username) or defaultgroup
+        info = read_input('Info [%s]?' % cred.info)
         if read_yes_no():
             return Credentials(name, username, password, group, info)
 
@@ -164,6 +165,10 @@ def find_matching_groups(name):
 def rows_matching_groups(reader, name):
     return [row for row in reader
             if not name or startswith_caseinsensitive(row[3], name)]
+
+def list_groups(name):
+    groups = find_matching_groups(name)
+    print_groups(groups)
 
 def print_groups(groups):
     for groupname, credentials in groups:
