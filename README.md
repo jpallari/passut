@@ -20,6 +20,30 @@ saved in CSV format encrypted using GPG.
 5. In your home directory there is a file `.passut.cfg`. Set your settings
    there.
 
+## Usage
+
+Passut takes two parameters: a command and an (optional) name. The way name
+behaves depends on the command. The commands are:
+
+* `get`, `g`: Search for a password with given name and pipe it to pipe
+  command.
+* `save`, `s`: Save a password with given name (the wizard will ask the rest).
+* `list`, `l`: List password names by given group name.
+
+## Examples
+
+Search for a password that starts with "foobar" and pipe it to pipe command:
+
+    $ passut.py get foobar
+
+Save a password with a name "example":
+
+    $ passut.py save example
+
+List password names where the group name starts with "important":
+
+    $ passut.py list important
+
 ## License
 
 (2-clause BSD license)

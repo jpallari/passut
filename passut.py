@@ -23,7 +23,7 @@ usage = """usage: passut.py [command] [name]
 commands:
   get, g    Search for a password with given name and pipe it to pipe command.
   save, s   Save a password with given name (the wizard will ask the rest).
-  list, l   List password names by given group name"""
+  list, l   List password names by given group name."""
 
 config_path = os.path.join(os.environ['HOME'], '.passut.cfg')
 
