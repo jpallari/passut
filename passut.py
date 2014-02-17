@@ -19,6 +19,12 @@ getaction = set(['get', 'g'])
 saveaction = set(['save', 's'])
 listaction = set(['list', 'l'])
 
+usage = """usage: passut.py [command] [name]
+commands:
+  get, g    Search for a password with given name and pipe it to pipe command.
+  save, s   Save a password with given name (the wizard will ask the rest).
+  list, l   List password names by given group name"""
+
 config_path = os.path.join(os.environ['HOME'], '.passut.cfg')
 
 default_config_file = """[passut]
@@ -55,7 +61,7 @@ class Passut(object):
         elif action in listaction:
             self.list_groups(name)
         else:
-            print 'Incorrect action:', action
+            print usage
 
     def find_and_deliver_credentials(self, name):
         self.deliver_credentials(self.find_credentials(name))
