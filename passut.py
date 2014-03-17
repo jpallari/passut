@@ -106,7 +106,7 @@ class Passut(object):
         return p.stdout
 
     def save_credentials(self, name):
-        defaultcreds = Credentials(name, '', '', defaultgroup, '')
+        defaultcreds = Credentials(name, '', '', self.defaultgroup, '')
         creds = get_creds_from_user(defaultcreds)
         readstream = self.credentials_readstream()
         writestream = self.credentials_writestream()
