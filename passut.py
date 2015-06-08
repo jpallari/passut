@@ -21,7 +21,7 @@ listaction = set(['list', 'l'])
 
 usage = """usage: passut.py [command] [name]
 commands:
-  get, g    Search for a password with given name and pipe it to pipe command.
+  get,  g   Search for a password with given name and pipe it to pipe command.
   save, s   Save a password with given name (the wizard will ask the rest).
   list, l   List password names by given group name."""
 
@@ -50,8 +50,8 @@ class Passut(object):
         self.pubkeyid = pubkeyid
         self.pipecmd = shlex.split(pipecmd)
         self.defaultgroup = defaultgroup
-        self.decryptcmd = ('gpg2', '-q', '-d')
-        self.encryptcmd = ('gpg2', '-ea', '-r', self.pubkeyid)
+        self.decryptcmd = ('gpg2', '-q', '--no-tty', '-d')
+        self.encryptcmd = ('gpg2', '-ea', '--no-tty', '-r', self.pubkeyid)
 
     def doaction(self, action, name):
         if action in getaction:
